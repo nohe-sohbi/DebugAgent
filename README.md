@@ -1,68 +1,78 @@
+# DebugAgent API (Go Version)
 
-# DebugAgent
-
-DebugAgent est un outil d'analyse et d'exploration de projets logiciels. Il utilise un agent IA pour analyser la structure d'un projet, lire des fichiers, effectuer des recherches dans le code et fournir des explications détaillées basées sur le contexte.
+DebugAgent est une API Go qui utilise un agent IA pour analyser la structure d'un projet logiciel, lire des fichiers, et fournir des explications détaillées en réponse à des questions.
 
 ## Fonctionnalités
 
+- Exposition d'une API pour l'analyse de projets.
 - Analyse automatique de la structure d'un projet.
 - Lecture et résumé des fichiers pertinents.
-- Recherche de termes spécifiques dans le code.
-- Génération d'explications détaillées pour répondre à des questions sur le projet.
-- Interaction avec le modèle Ollama pour des analyses avancées.
+- Génération d'explications détaillées pour répondre à des questions sur le projet via Ollama.
 
 ## Prérequis
 
-Avant d'installer et d'utiliser DebugAgent, assurez-vous d'avoir les éléments suivants :
+Avant d'utiliser DebugAgent, assurez-vous d'avoir les éléments suivants :
 
-- **Python 3.8+** installé sur votre machine.
-- Le package `ollama` installé (voir ci-dessous).
-- Un environnement virtuel Python (recommandé).
-- Les dépendances listées dans `requirements.txt`.
+- **Go 1.18+** installé sur votre machine.
+- **Ollama** en cours d'exécution sur votre machine.
 
-## Installation
-
-Suivez les étapes ci-dessous pour installer et configurer DebugAgent :
+## Installation et Lancement
 
 1. Clonez le dépôt :
    ```bash
    git clone <URL_DU_DEPOT>
-   cd DebugAgent
+   cd <NOM_DU_DOSSIER>
    ```
 
-2. Créez un environnement virtuel Python :
+2. Installez les dépendances Go :
    ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # Sur Windows : venv\Scripts\activate
+   go mod tidy
    ```
 
-3. Installez les dépendances :
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. Configurez les variables d'environnement nécessaires :
+3. Configurez les variables d'environnement (optionnel) :
    - `OLLAMA_MODEL` : Nom du modèle Ollama à utiliser (par défaut : `gemma3:latest`).
-   - `LOG_LEVEL` : Niveau de journalisation (`DEBUG`, `INFO`, etc.).
+   - `PORT` : Port sur lequel le serveur écoutera (par défaut : `8080`).
    - Exemple :
      ```bash
      export OLLAMA_MODEL="gemma3:latest"
-     export LOG_LEVEL="INFO"
+     export PORT="8888"
      ```
 
-5. Lancez l'application :
+4. Lancez le serveur :
    ```bash
-   python main.py
+   go run .
    ```
+   Le serveur démarrera et écoutera sur le port configuré (8080 par défaut).
 
-## Utilisation
+## Utilisation de l'API
 
-1. Lors de l'exécution, l'agent vous demandera de spécifier un dossier projet et une question ou un problème à résoudre.
-2. L'agent analysera le projet, planifiera des étapes d'exploration et fournira des explications basées sur les résultats.
+Pour analyser un projet, envoyez une requête `POST` au point de terminaison `/analyze`.
 
-## Journalisation
+### Exemple avec `curl`
 
-Les journaux sont configurés pour afficher les messages dans la console. Vous pouvez ajuster le niveau de détail en modifiant la variable d'environnement `LOG_LEVEL`.
+```bash
+curl -X POST http://localhost:8080/analyze \
+-H "Content-Type: application/json" \
+-d '{
+    "project_path": "/chemin/vers/votre/projet",
+    "question": "Explique le but du fichier principal de ce projet."
+}'
+```
+
+### Paramètres de la Requête
+
+- `project_path` (string, requis) : Le chemin absolu vers le dossier du projet que vous souhaitez analyser.
+- `question` (string, requis) : La question que vous posez sur le projet.
+
+### Réponse
+
+L'API retournera une réponse JSON contenant l'explication générée par l'IA.
+
+```json
+{
+    "answer": "L'explication générée par l'IA sur le projet..."
+}
+```
 
 ## Contribution
 
