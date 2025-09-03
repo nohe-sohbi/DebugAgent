@@ -1,5 +1,4 @@
-# Docker Compose file
-docker-compose.yml
+# Directory for local projects to be analyzed by the agent
 
 # Directory for local projects to be analyzed by the agent
 /projects/
