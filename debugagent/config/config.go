@@ -1,8 +1,8 @@
 package config
 
 import (
+	"fmt"
 	"os"
-	"path/filepath"
 
 	"gopkg.in/yaml.v3"
 )
@@ -52,21 +52,14 @@ type Config struct {
 // AppConfig holds the loaded configuration.
 var AppConfig *Config
 
-// LoadConfig loads the configuration from the config.yaml file.
+// LoadConfig loads the configuration from the "config.yaml" file.
+// It assumes the configuration file is in the current working directory.
 func LoadConfig() error {
-	// Find the root directory of the project
-	// This is a bit of a hack, but it works for this project structure.
-	// A more robust solution would be to use build tags or other methods.
-	goModPath, err := findGoMod()
-	if err != nil {
-		return err
-	}
-	rootDir := filepath.Dir(goModPath)
-	configPath := filepath.Join(rootDir, "config.yaml")
+	configPath := "config.yaml"
 
 	data, err := os.ReadFile(configPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not read config file at %s: %w", configPath, err)
 	}
 
 	var cfg Config
@@ -76,25 +69,4 @@ func LoadConfig() error {
 
 	AppConfig = &cfg
 	return nil
-}
-
-// findGoMod finds the path to the go.mod file.
-func findGoMod() (string, error) {
-	dir, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-
-	for {
-		goModPath := filepath.Join(dir, "go.mod")
-		if _, err := os.Stat(goModPath); err == nil {
-			return goModPath, nil
-		}
-
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return "", os.ErrNotExist
-		}
-		dir = parent
-	}
 }
