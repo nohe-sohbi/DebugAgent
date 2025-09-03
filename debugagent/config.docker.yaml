@@ -1,0 +1,88 @@
+# Configuration for the DebugAgent API (Docker)
+
+server:
+  port: 8080
+
+logging:
+  level: "info" # "debug", "info", "warn", "error"
+  format: "text" # "text" or "json"
+  output: "stdout" # "stdout", "stderr", or a file path
+
+ollama:
+  host: "http://ollama:11434" # Changed for Docker networking
+  model: "gemma3:latest"
+
+analysis:
+  max_exploration_iterations: 6
+  max_directory_depth: 5
+  max_file_read_size: 150000 # in bytes
+  max_prompt_length: 7500
+
+explorer:
+  ignore_dirs:
+    - ".git"
+    - ".vscode"
+    - "node_modules"
+    - "__pycache__"
+    - "venv"
+    - ".venv"
+    - "target"
+    - "build"
+    - "dist"
+    - "vendor"
+    - ".idea"
+    - ".composer"
+    - "cache"
+    - "logs"
+    - "tmp"
+    - "temp"
+  ignore_prefixes:
+    - "."
+    - "_"
+  ignore_extensions:
+    - ".log"
+    - ".tmp"
+    - ".bak"
+    - ".swp"
+    - ".map"
+    - ".lock"
+    - ".DS_Store"
+    - ".pyc"
+    - ".pyo"
+    - ".class"
+    - ".o"
+    - ".so"
+    - ".dll"
+    - ".exe"
+    - ".jar"
+    - ".war"
+    - ".ear"
+    - ".zip"
+    - ".gz"
+    - ".tar"
+    - ".rar"
+    - ".7z"
+    - ".pdf"
+    - ".doc"
+    - ".docx"
+    - ".xls"
+    - ".xlsx"
+    - ".ppt"
+    - ".pptx"
+    - ".odt"
+    - ".ods"
+    - ".odp"
+    - ".jpg"
+    - ".jpeg"
+    - ".png"
+    - ".gif"
+    - ".bmp"
+    - ".svg"
+    - ".webp"
+    - ".mp3"
+    - ".wav"
+    - ".ogg"
+    - ".mp4"
+    - ".mov"
+    - ".avi"
+    - ".webm"
