@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  debugagent:
+    build:
+      context: .
+      dockerfile: debugagent/Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./debugagent/config.docker.yaml:/app/config.yaml
+    depends_on:
+      - ollama
+
+  frontend:
+    image: node:18
+    working_dir: /app/frontend
+    command: npm start
+    volumes:
+      - ./frontend:/app/frontend
+    ports:
+      - "3000:3000"
+
+  ollama:
+    image: ollama/ollama
+    ports:
+      - "11434:11434"
