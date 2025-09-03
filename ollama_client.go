@@ -1,13 +1,13 @@
 package main
 
 import (
+	"debugagent/config"
 	"fmt"
-	"log"
 	"net/url"
-	"os"
 	"strings"
 
 	"github.com/JexSrs/go-ollama"
+	"github.com/sirupsen/logrus"
 )
 
 
@@ -19,10 +19,8 @@ type OllamaClient struct {
 
 // NewOllamaClient crée un nouveau client pour Ollama.
 func NewOllamaClient() (*OllamaClient, error) {
-	host := os.Getenv("OLLAMA_HOST")
-	if host == "" {
-		host = ollamaDefaultHost
-	}
+	host := config.AppConfig.Ollama.Host
+	model := config.AppConfig.Ollama.Model
 
 	ollamaURL, err := url.Parse(host)
 	if err != nil {
@@ -31,13 +29,8 @@ func NewOllamaClient() (*OllamaClient, error) {
 
 	client := ollama.New(*ollamaURL)
 
-	model := os.Getenv("OLLAMA_MODEL")
-	if model == "" {
-		model = ollamaDefaultModel
-	}
-
-	log.Printf("Utilisation du client Ollama pour l'hôte: %s", host)
-	log.Printf("Utilisation du modèle Ollama: %s", model)
+	logrus.Infof("Using Ollama client for host: %s", host)
+	logrus.Infof("Using Ollama model: %s", model)
 
 	return &OllamaClient{
 		client: client,
@@ -47,9 +40,10 @@ func NewOllamaClient() (*OllamaClient, error) {
 
 // ollamaRequest envoie une requête à Ollama en utilisant la fonction Generate.
 func (oc *OllamaClient) ollamaRequest(systemMessage, userPrompt string) (string, error) {
-	if len(userPrompt) > maxPromptLength {
-		log.Printf("Avertissement : le prompt est tronqué à %d caractères.", maxPromptLength)
-		userPrompt = userPrompt[:maxPromptLength]
+	maxPromptLen := config.AppConfig.Analysis.MaxPromptLength
+	if len(userPrompt) > maxPromptLen {
+		logrus.Warnf("Prompt is being truncated to %d characters.", maxPromptLen)
+		userPrompt = userPrompt[:maxPromptLen]
 	}
 
 	// Utilisation de la fonction Generate qui est plus simple pour des requêtes uniques.
@@ -65,7 +59,7 @@ func (oc *OllamaClient) ollamaRequest(systemMessage, userPrompt string) (string,
 
 	if res.Done {
 		if res.Response != "" {
-			log.Println("Réponse reçue d'Ollama.")
+			logrus.Debug("Response received from Ollama.")
 			// Nettoyer la réponse des "```" que le modèle ajoute parfois
 			return strings.TrimSpace(strings.Trim(res.Response, "```")), nil
 		}

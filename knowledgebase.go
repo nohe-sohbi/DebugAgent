@@ -3,10 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/sirupsen/logrus"
 )
 
 // KnowledgeBase structure pour stocker les informations collectées pendant l'analyse.
@@ -26,7 +27,7 @@ type KnowledgeBase struct {
 func NewKnowledgeBase(projectPath string) *KnowledgeBase {
 	absPath, err := filepath.Abs(projectPath)
 	if err != nil {
-		log.Printf("Avertissement : impossible de résoudre le chemin absolu pour %s: %v", projectPath, err)
+		logrus.Warnf("Could not resolve absolute path for %s: %v", projectPath, err)
 		absPath = projectPath
 	}
 
@@ -54,12 +55,12 @@ func (kb *KnowledgeBase) AddFileContent(absFilepath string, content string) {
 
 	relPath, err := kb.getRelativePath(absFilepath)
 	if err != nil {
-		log.Printf("Avertissement : impossible d'obtenir le chemin relatif pour %s: %v. Utilisation du chemin absolu.", absFilepath, err)
+		logrus.Warnf("Could not get relative path for %s: %v. Using absolute path.", absFilepath, err)
 		relPath = absFilepath
 	}
 
 	kb.FileContents[relPath] = content
-	log.Printf("Contenu ajouté/mis à jour pour '%s'", relPath)
+	logrus.Infof("Content added/updated for '%s'", relPath)
 }
 
 // AddNote ajoute une note d'analyse.
@@ -70,7 +71,7 @@ func (kb *KnowledgeBase) AddNote(note string) {
 	// Éviter les notes dupliquées consécutives
 	if len(kb.AnalysisNotes) == 0 || kb.AnalysisNotes[len(kb.AnalysisNotes)-1] != note {
 		kb.AnalysisNotes = append(kb.AnalysisNotes, note)
-		log.Printf("Note ajoutée : %s...", note[:min(100, len(note))])
+		logrus.Debugf("Note added: %s...", note[:min(100, len(note))])
 	}
 }
 
@@ -82,7 +83,7 @@ func (kb *KnowledgeBase) AddHistory(actionDescription string) {
 	// Éviter les entrées d'historique dupliquées consécutives
 	if len(kb.ExplorationHistory) == 0 || kb.ExplorationHistory[len(kb.ExplorationHistory)-1] != actionDescription {
 		kb.ExplorationHistory = append(kb.ExplorationHistory, actionDescription)
-		log.Printf("Historique ajouté : %s", actionDescription)
+		logrus.Debugf("History added: %s", actionDescription)
 	}
 }
 
@@ -93,7 +94,7 @@ func (kb *KnowledgeBase) SetProjectType(pType string) {
 
 	if pType != "" && kb.ProjectType != pType {
 		kb.ProjectType = pType
-		log.Printf("Type de projet mis à jour : %s", pType)
+		logrus.Infof("Project type updated: %s", pType)
 	}
 }
 
@@ -156,7 +157,7 @@ func (kb *KnowledgeBase) getContextSummary(userProblem string, maxPromptLength i
 	// Truncate if too long
 	finalSummary := summary.String()
 	if len(finalSummary) > maxPromptLength-500 {
-		log.Printf("Warning: Context summary is potentially too long (%d chars).", len(finalSummary))
+		logrus.Warnf("Context summary is potentially too long (%d chars).", len(finalSummary))
 	}
 
 	return finalSummary
