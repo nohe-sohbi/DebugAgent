@@ -1,48 +1,40 @@
 package main
 
 import (
+	"debugagent/config"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
-)
 
+	"github.com/sirupsen/logrus"
+)
 
 var (
-	ignoreDirs = map[string]bool{
-		".git":           true,
-		".vscode":        true,
-		"node_modules":   true,
-		"__pycache__":    true,
-		"venv":           true,
-		".venv":          true,
-		"target":         true,
-		"build":          true,
-		"dist":           true,
-		"vendor":         true,
-		".idea":          true,
-		".composer":      true,
-		"cache":          true,
-		"logs":           true,
-		"tmp":            true,
-		"temp":           true,
-	}
-	ignorePrefixes = []string{".", "_"}
-	ignoreExtensions = map[string]bool{
-		".log":   true, ".tmp": true, ".bak": true, ".swp": true, ".map": true, ".lock": true, ".DS_Store": true,
-		".pyc":   true, ".pyo": true, ".class": true, ".o": true, ".so": true, ".dll": true, ".exe": true,
-		".jar":   true, ".war": true, ".ear": true, ".zip": true, ".gz": true, ".tar": true, ".rar": true, ".7z": true,
-		".pdf":   true, ".doc": true, ".docx": true, ".xls": true, ".xlsx": true, ".ppt": true, ".pptx": true,
-		".odt":   true, ".ods": true, ".odp": true, ".jpg": true, ".jpeg": true, ".png": true, ".gif": true,
-		".bmp":   true, ".svg": true, ".webp": true, ".mp3": true, ".wav": true, ".ogg": true, ".mp4": true,
-		".mov":   true, ".avi": true, ".webm": true,
-	}
+	ignoreDirs       map[string]bool
+	ignoreExtensions map[string]bool
+	ignorePrefixes   []string
 )
+
+func initializeExplorerConfig() {
+	cfg := config.AppConfig.Explorer
+	ignoreDirs = make(map[string]bool)
+	for _, dir := range cfg.IgnoreDirs {
+		ignoreDirs[dir] = true
+	}
+	ignoreExtensions = make(map[string]bool)
+	for _, ext := range cfg.IgnoreExtensions {
+		ignoreExtensions[ext] = true
+	}
+	ignorePrefixes = cfg.IgnorePrefixes
+}
 
 // getDirectoryStructure récupère la structure récursivement, en filtrant et limitant la profondeur.
 func getDirectoryStructure(rootDir string, maxDepth int, currentDepth int) (map[string]interface{}, error) {
+	if ignoreDirs == nil {
+		initializeExplorerConfig()
+	}
 	structure := make(map[string]interface{})
 	if currentDepth >= maxDepth {
 		structure["..."] = fmt.Sprintf("(limite de profondeur %d atteinte)", maxDepth)
@@ -119,23 +111,24 @@ func readFileContent(absFilepath string) (string, error) {
 
 	// Lire le contenu du fichier
 	size := fileInfo.Size()
-	if size > maxFileReadSize {
-		log.Printf("Fichier '%s' (%d octets) trop volumineux. Lecture partielle.", filepath.Base(absFilepath), size)
+	maxSize := config.AppConfig.Analysis.MaxFileReadSize
+	if size > maxSize {
+		logrus.Warnf("File '%s' (%d bytes) is too large. Reading partially.", filepath.Base(absFilepath), size)
 		content, err := os.ReadFile(absFilepath)
 		if err != nil {
-			return "", fmt.Errorf("erreur lors de la lecture partielle du fichier: %w", err)
+			return "", fmt.Errorf("error reading partial file: %w", err)
 		}
 
-		startContent := string(content[:maxFileReadSize/2])
-		endContent := string(content[len(content)-(maxFileReadSize/2):])
+		startContent := string(content[:int(maxSize)/2])
+		endContent := string(content[len(content)-(int(maxSize)/2):])
 
-		return fmt.Sprintf("%s\n\n[... contenu tronqué (fichier trop volumineux) ...]\n\n%s", startContent, endContent), nil
+		return fmt.Sprintf("%s\n\n[... content truncated (file too large) ...]\n\n%s", startContent, endContent), nil
 	}
 
-	log.Printf("Lecture complète du fichier '%s' (%d octets).", filepath.Base(absFilepath), size)
+	logrus.Infof("Reading complete file '%s' (%d bytes).", filepath.Base(absFilepath), size)
 	content, err := os.ReadFile(absFilepath)
 	if err != nil {
-		return "", fmt.Errorf("erreur lors de la lecture complète du fichier: %w", err)
+		return "", fmt.Errorf("error reading complete file: %w", err)
 	}
 
 	return string(content), nil
