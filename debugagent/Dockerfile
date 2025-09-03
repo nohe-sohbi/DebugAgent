@@ -1,11 +1,26 @@
-# Stage 1: Build
-FROM golang:1.24-alpine AS builder
+# Stage 1: Frontend build
+FROM node:18 AS frontend-builder
 
-# Set the Current Working Directory inside the container
+WORKDIR /app/frontend
+
+# Copy frontend package.json and package-lock.json
+COPY ../frontend/package.json ../frontend/package-lock.json ./
+
+# Install frontend dependencies
+RUN npm install
+
+# Copy the rest of the frontend source code
+COPY ../frontend/ ./
+
+# Build the frontend
+RUN npm run build
+
+# Stage 2: Go build
+FROM golang:1.24 AS go-builder
+
 WORKDIR /app
 
-# We copy the Go Module file first to leverage Docker's caching.
-# This will prevent re-downloading of dependencies on every build.
+# Copy Go module files
 COPY go.mod go.sum ./
 RUN go mod download
 
@@ -13,11 +28,9 @@ RUN go mod download
 COPY . .
 
 # Build the Go app
-# CGO_ENABLED=0 is used to build a statically linked binary.
-# -ldflags="-w -s" is used to reduce the size of the binary.
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /debugagent .
 
-# Stage 2: Deploy
+# Stage 3: Final image
 FROM alpine:latest
 
 # Add ca-certificates to make SSL calls
@@ -29,8 +42,10 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 # Set the Current Working Directory inside the container
 WORKDIR /app
 
-# Copy the built binary from the builder stage
-COPY --from=builder /debugagent .
+# Copy the built Go binary from the go-builder stage
+COPY --from=go-builder /debugagent .
+# Copy the built frontend from the frontend-builder stage
+COPY --from=frontend-builder /app/frontend/build ./static
 # Copy the configuration file
 COPY config.yaml .
 

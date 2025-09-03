@@ -5,24 +5,24 @@ import (
 	"debugagent/logging"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"github.com/sirupsen/logrus"
 )
 
-
-// AnalyzeRequest définit la structure pour la requête de l'API.
+// AnalyzeRequest defines the structure for the API request.
 type AnalyzeRequest struct {
 	ProjectPath string `json:"project_path"`
 	Question    string `json:"question"`
 }
 
-// AnalyzeResponse définit la structure pour la réponse de l'API.
+// AnalyzeResponse defines the structure for the API response.
 type AnalyzeResponse struct {
 	Answer string `json:"answer"`
 }
-
 
 func analyzeHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -30,20 +30,66 @@ func analyzeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req AnalyzeRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Error decoding JSON request", http.StatusBadRequest)
+	// Parse the multipart form data
+	err := r.ParseMultipartForm(32 << 20) // 32MB max memory
+	if err != nil {
+		http.Error(w, "Error parsing multipart form", http.StatusBadRequest)
 		return
 	}
 
-	// --- Project Path Validation ---
-	projInfo, err := os.Stat(req.ProjectPath)
-	if os.IsNotExist(err) || !projInfo.IsDir() {
-		http.Error(w, fmt.Sprintf("Project path '%s' is not a valid directory.", req.ProjectPath), http.StatusBadRequest)
+	// Get the question from the form data
+	question := r.FormValue("question")
+	if question == "" {
+		http.Error(w, "Missing 'question' field", http.StatusBadRequest)
 		return
+	}
+
+	// Create a temporary directory to store the uploaded files
+	tempDir, err := os.MkdirTemp("", "uploaded-project-")
+	if err != nil {
+		http.Error(w, "Error creating temporary directory", http.StatusInternalServerError)
+		return
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Get the files from the form data
+	files := r.MultipartForm.File["files"]
+	if len(files) == 0 {
+		http.Error(w, "No files uploaded", http.StatusBadRequest)
+		return
+	}
+
+	for _, fileHeader := range files {
+		// Open the uploaded file
+		file, err := fileHeader.Open()
+		if err != nil {
+			http.Error(w, "Error opening uploaded file", http.StatusInternalServerError)
+			return
+		}
+		defer file.Close()
+
+		// Create the file in the temporary directory
+		destPath := filepath.Join(tempDir, fileHeader.Filename)
+		destFile, err := os.Create(destPath)
+		if err != nil {
+			http.Error(w, "Error creating file in temporary directory", http.StatusInternalServerError)
+			return
+		}
+		defer destFile.Close()
+
+		// Copy the file content
+		if _, err := io.Copy(destFile, file); err != nil {
+			http.Error(w, "Error copying file content", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// --- Create and Run Analysis Engine ---
+	req := AnalyzeRequest{
+		ProjectPath: tempDir,
+		Question:    question,
+	}
+
 	engine, err := NewAnalysisEngine(req)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error initializing analysis engine: %v", err), http.StatusInternalServerError)
@@ -72,6 +118,10 @@ func main() {
 	logging.InitLogger()
 
 	http.HandleFunc("/analyze", analyzeHandler)
+
+	// Serve the frontend
+	fs := http.FileServer(http.Dir("./static"))
+	http.Handle("/", fs)
 
 	port := fmt.Sprintf(":%d", config.AppConfig.Server.Port)
 	logrus.Infof("Starting server on port %s...", port)
