@@ -1,0 +1,11 @@
+{
+  "projectAnalysis": "Analyse de Projet",
+  "yourQuestion": "Votre Question",
+  "questionPlaceholder": "Que voulez-vous savoir sur votre projet ?",
+  "projectFiles": "Fichiers du Projet",
+  "dragAndDrop": "Glissez et déposez un dossier ou des fichiers ici",
+  "orSelectFiles": "Ou sélectionnez des fichiers",
+  "selectedFiles": "Fichiers Sélectionnés :",
+  "analyzeProject": "Analyser le Projet",
+  "pleaseSelectProject": "Veuillez sélectionner un projet/fichier."
+}

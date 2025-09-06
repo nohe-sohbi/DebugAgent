@@ -1,0 +1,11 @@
+{
+  "projectAnalysis": "Project Analysis",
+  "yourQuestion": "Your Question",
+  "questionPlaceholder": "What do you want to know about your project?",
+  "projectFiles": "Project Files",
+  "dragAndDrop": "Drag and drop a folder or files here",
+  "orSelectFiles": "Or select files",
+  "selectedFiles": "Selected Files:",
+  "analyzeProject": "Analyze Project",
+  "pleaseSelectProject": "Please select a project/file."
+}
