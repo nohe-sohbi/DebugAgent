@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 function App() {
+  const { t } = useTranslation();
   const [question, setQuestion] = useState('');
   const [files, setFiles] = useState([]);
 
@@ -20,7 +22,7 @@ function App() {
 
   const handleSubmit = async () => {
     if (files.length === 0) {
-      alert('Please select a project/file.');
+      alert(t('pleaseSelectProject'));
       return;
     }
 
@@ -44,37 +46,37 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center">
       <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-2xl">
-        <h1 className="text-2xl font-bold mb-6 text-center text-gray-700">Project Analysis</h1>
+        <h1 className="text-2xl font-bold mb-6 text-center text-gray-700">{t('projectAnalysis')}</h1>
 
         <div className="mb-6">
           <label htmlFor="question" className="block text-gray-700 text-sm font-bold mb-2">
-            Your Question
+            {t('yourQuestion')}
           </label>
           <textarea
             id="question"
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline h-24"
-            placeholder="What do you want to know about your project?"
+            placeholder={t('questionPlaceholder')}
           />
         </div>
 
         <div className="mb-4">
           <label className="block text-gray-700 text-sm font-bold mb-2">
-            Project Files
+            {t('projectFiles')}
           </label>
           <div
             onDrop={handleDrop}
             onDragOver={handleDragOver}
             className="border-dashed border-2 border-gray-300 p-6 rounded-lg text-center cursor-pointer hover:border-gray-500"
           >
-            <p className="text-gray-500">Drag and drop a folder or files here</p>
+            <p className="text-gray-500">{t('dragAndDrop')}</p>
           </div>
         </div>
 
         <div className="mb-6">
           <label className="block text-gray-700 text-sm font-bold mb-2">
-            Or select files
+            {t('orSelectFiles')}
           </label>
           <input
             type="file"
@@ -87,7 +89,7 @@ function App() {
 
         {files.length > 0 && (
           <div className="mb-4">
-            <h3 className="text-lg font-semibold text-gray-700">Selected Files:</h3>
+            <h3 className="text-lg font-semibold text-gray-700">{t('selectedFiles')}</h3>
             <ul>
               {files.map((file, index) => (
                 <li key={index} className="text-gray-600">{file.name}</li>
@@ -101,7 +103,7 @@ function App() {
             onClick={handleSubmit}
             className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
           >
-            Analyze Project
+            {t('analyzeProject')}
           </button>
         </div>
       </div>

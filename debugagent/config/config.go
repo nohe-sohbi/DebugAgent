@@ -1,9 +1,12 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
 	"os"
+	"strings"
 
+	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 )
 
@@ -52,19 +55,40 @@ type Config struct {
 // AppConfig holds the loaded configuration.
 var AppConfig *Config
 
-// LoadConfig loads the configuration from the "config.yaml" file.
-// It assumes the configuration file is in the current working directory.
+// LoadConfig loads the configuration from file and environment variables.
 func LoadConfig() error {
-	configPath := "config.yaml"
+	v := viper.New()
 
-	data, err := os.ReadFile(configPath)
+	// Set default configuration file
+	defaultConfig, err := os.ReadFile("config.default.yaml")
 	if err != nil {
-		return fmt.Errorf("could not read config file at %s: %w", configPath, err)
+		return fmt.Errorf("could not read default config file: %w", err)
+	}
+	if err := v.ReadConfig(bytes.NewBuffer(defaultConfig)); err != nil {
+		return fmt.Errorf("could not parse default config: %w", err)
 	}
 
+	// Set up viper to look for a config file named "config.yaml"
+	v.SetConfigName("config")
+	v.AddConfigPath(".")
+	v.SetConfigType("yaml")
+
+	// Attempt to read the user-provided config file and merge it
+	if err := v.MergeInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			return fmt.Errorf("could not read user config file: %w", err)
+		}
+	}
+
+	// Set up environment variable overrides
+	v.SetEnvPrefix("DEBUGAGENT")
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	v.AutomaticEnv()
+
+	// Unmarshal the configuration into the AppConfig struct
 	var cfg Config
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return err
+	if err := v.Unmarshal(&cfg); err != nil {
+		return fmt.Errorf("could not unmarshal config: %w", err)
 	}
 
 	AppConfig = &cfg

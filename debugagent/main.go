@@ -110,6 +110,12 @@ func analyzeHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
 func main() {
 	if err := config.LoadConfig(); err != nil {
 		logrus.Fatalf("Error loading configuration: %v", err)
@@ -118,6 +124,7 @@ func main() {
 	logging.InitLogger()
 
 	http.HandleFunc("/analyze", analyzeHandler)
+	http.HandleFunc("/health", healthCheckHandler)
 
 	// Serve the frontend
 	fs := http.FileServer(http.Dir("./static"))
