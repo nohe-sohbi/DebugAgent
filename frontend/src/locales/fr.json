@@ -9,5 +9,7 @@
   "analyzeProject": "Analyser le Projet",
   "pleaseSelectProject": "Veuillez sélectionner un projet/fichier.",
   "analyzing": "Analyse en cours...",
-  "analysisResult": "Résultat de l'Analyse"
+  "analysisResult": "Résultat de l'analyse",
+  "clearSelection": "Vider la sélection",
+  "uploading": "Envoi en cours"
 }

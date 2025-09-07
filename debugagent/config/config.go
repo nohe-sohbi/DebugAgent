@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/spf13/viper"
-	"gopkg.in/yaml.v3"
 )
 
 // ServerConfig defines the server configuration.

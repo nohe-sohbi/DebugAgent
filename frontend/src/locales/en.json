@@ -9,5 +9,7 @@
   "analyzeProject": "Analyze Project",
   "pleaseSelectProject": "Please select a project/file.",
   "analyzing": "Analyzing...",
-  "analysisResult": "Analysis Result"
+  "analysisResult": "Analysis Result",
+  "clearSelection": "Clear selection",
+  "uploading": "Uploading"
 }
