@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 function App() {
@@ -7,9 +7,19 @@ function App() {
   const [files, setFiles] = useState([]);
   const [answer, setAnswer] = useState('');
   const [loading, setLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef();
 
   const handleFileChange = (e) => {
     setFiles([...e.target.files]);
+  };
+
+  const handleClearFiles = () => {
+    setFiles([]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = null;
+    }
   };
 
   const handleDrop = (e) => {
@@ -22,7 +32,7 @@ function App() {
     e.preventDefault();
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (files.length === 0) {
       alert(t('pleaseSelectProject'));
       return;
@@ -31,25 +41,42 @@ function App() {
     const formData = new FormData();
     formData.append('question', question);
     for (const file of files) {
-      // We use webkitRelativePath to preserve the directory structure
       formData.append('files', file, file.webkitRelativePath || file.name);
     }
 
-    setLoading(true);
     setAnswer('');
-    try {
-      const response = await fetch('/analyze', {
-        method: 'POST',
-        body: formData,
-      });
-      const data = await response.json();
-      setAnswer(data.answer);
-    } catch (error) {
-      console.error('Error submitting analysis request:', error);
-      // Optionally, set an error message to display in the UI
-    } finally {
+    setUploadProgress(0);
+    setIsUploading(true);
+
+    const xhr = new XMLHttpRequest();
+
+    xhr.upload.addEventListener('progress', (event) => {
+      if (event.lengthComputable) {
+        const percentComplete = Math.round((event.loaded / event.total) * 100);
+        setUploadProgress(percentComplete);
+      }
+    });
+
+    xhr.addEventListener('load', () => {
+      setIsUploading(false);
+      setLoading(true); // Analysis starts now
+      if (xhr.status === 200) {
+        const data = JSON.parse(xhr.responseText);
+        setAnswer(data.answer);
+      } else {
+        console.error('Error submitting analysis request:', xhr.statusText);
+      }
       setLoading(false);
-    }
+    });
+
+    xhr.addEventListener('error', () => {
+      setIsUploading(false);
+      setLoading(false);
+      console.error('Error submitting analysis request: An unknown error occurred.');
+    });
+
+    xhr.open('POST', '/analyze', true);
+    xhr.send(formData);
   };
 
   return (
@@ -92,13 +119,22 @@ function App() {
             multiple
             webkitdirectory="true"
             onChange={handleFileChange}
+            ref={fileInputRef}
             className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
           />
         </div>
 
         {files.length > 0 && (
           <div className="mb-4">
-            <h3 className="text-lg font-semibold text-gray-700">{t('selectedFiles')}</h3>
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="text-lg font-semibold text-gray-700">{t('selectedFiles')}</h3>
+              <button
+                onClick={handleClearFiles}
+                className="text-sm text-red-500 hover:text-red-700"
+              >
+                {t('clearSelection')}
+              </button>
+            </div>
             <ul>
               {files.map((file, index) => (
                 <li key={index} className="text-gray-600">{file.name}</li>
@@ -111,11 +147,24 @@ function App() {
           <button
             onClick={handleSubmit}
             className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline disabled:bg-blue-300"
-            disabled={loading}
+            disabled={isUploading || loading}
           >
-            {loading ? t('analyzing') : t('analyzeProject')}
+            {isUploading
+              ? `${t('uploading')}... ${uploadProgress}%`
+              : loading
+              ? t('analyzing')
+              : t('analyzeProject')}
           </button>
         </div>
+
+        {isUploading && (
+          <div className="w-full bg-gray-200 rounded-full h-2.5 mt-4">
+            <div
+              className="bg-blue-600 h-2.5 rounded-full"
+              style={{ width: `${uploadProgress}%` }}
+            ></div>
+          </div>
+        )}
 
         {answer && (
           <div className="mt-6">
