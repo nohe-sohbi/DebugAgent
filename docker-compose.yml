@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   backend:
     build:
@@ -8,18 +6,20 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./backend/config.docker.yaml:/app/config.yaml
+      - ./backend/config.default.yaml:/app/config.yaml
     depends_on:
       - ollama
 
   frontend:
     image: node:18
     working_dir: /app/frontend
-    command: npm start
+    command: sh -c "npm install && npm start"
     volumes:
       - ./frontend:/app/frontend
     ports:
       - "3000:3000"
+    environment:
+      - CHOKIDAR_USEPOLLING=true
 
   ollama:
     image: ollama/ollama
