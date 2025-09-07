@@ -75,7 +75,7 @@ function App() {
       console.error('Error submitting analysis request: An unknown error occurred.');
     });
 
-    xhr.open('POST', '/analyze', true);
+    xhr.open('POST', 'http://localhost:8080/analyze', true);
     xhr.send(formData);
   };
 
