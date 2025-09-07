@@ -13,12 +13,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// AnalyzeRequest defines the structure for the API request.
-type AnalyzeRequest struct {
-	ProjectPath string `json:"project_path"`
-	Question    string `json:"question"`
-}
-
 // AnalyzeResponse defines the structure for the API response.
 type AnalyzeResponse struct {
 	Answer string `json:"answer"`
@@ -69,7 +63,13 @@ func analyzeHandler(w http.ResponseWriter, r *http.Request) {
 		defer file.Close()
 
 		// Create the file in the temporary directory
+		// The client side sends relative paths, so we need to create the directory structure
 		destPath := filepath.Join(tempDir, fileHeader.Filename)
+		if err := os.MkdirAll(filepath.Dir(destPath), os.ModePerm); err != nil {
+			http.Error(w, "Error creating directory structure", http.StatusInternalServerError)
+			return
+		}
+
 		destFile, err := os.Create(destPath)
 		if err != nil {
 			http.Error(w, "Error creating file in temporary directory", http.StatusInternalServerError)
@@ -85,6 +85,7 @@ func analyzeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// --- Create and Run Analysis Engine ---
+	// The AnalyzeRequest struct is defined in engine.go, so we use it here
 	req := AnalyzeRequest{
 		ProjectPath: tempDir,
 		Question:    question,

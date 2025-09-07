@@ -11,6 +11,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// AnalyzeRequest defines the structure for the API request.
+type AnalyzeRequest struct {
+	ProjectPath string
+	Question    string
+}
+
 // AnalysisEngine orchestrates the project analysis.
 type AnalysisEngine struct {
 	kb           *KnowledgeBase

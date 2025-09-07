@@ -7,5 +7,7 @@
   "orSelectFiles": "Ou sélectionnez des fichiers",
   "selectedFiles": "Fichiers Sélectionnés :",
   "analyzeProject": "Analyser le Projet",
-  "pleaseSelectProject": "Veuillez sélectionner un projet/fichier."
+  "pleaseSelectProject": "Veuillez sélectionner un projet/fichier.",
+  "analyzing": "Analyse en cours...",
+  "analysisResult": "Résultat de l'Analyse"
 }
