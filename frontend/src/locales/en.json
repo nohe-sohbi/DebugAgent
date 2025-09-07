@@ -7,5 +7,7 @@
   "orSelectFiles": "Or select files",
   "selectedFiles": "Selected Files:",
   "analyzeProject": "Analyze Project",
-  "pleaseSelectProject": "Please select a project/file."
+  "pleaseSelectProject": "Please select a project/file.",
+  "analyzing": "Analyzing...",
+  "analysisResult": "Analysis Result"
 }

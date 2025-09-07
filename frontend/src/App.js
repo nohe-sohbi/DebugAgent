@@ -5,6 +5,8 @@ function App() {
   const { t } = useTranslation();
   const [question, setQuestion] = useState('');
   const [files, setFiles] = useState([]);
+  const [answer, setAnswer] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleFileChange = (e) => {
     setFiles([...e.target.files]);
@@ -27,19 +29,26 @@ function App() {
     }
 
     const formData = new FormData();
-    formData.append('project_path', files[0].path); // Sending the path of the first file
     formData.append('question', question);
+    for (const file of files) {
+      // We use webkitRelativePath to preserve the directory structure
+      formData.append('files', file, file.webkitRelativePath || file.name);
+    }
 
+    setLoading(true);
+    setAnswer('');
     try {
       const response = await fetch('/analyze', {
         method: 'POST',
         body: formData,
       });
       const data = await response.json();
-      console.log(data);
-      // Handle response
+      setAnswer(data.answer);
     } catch (error) {
       console.error('Error submitting analysis request:', error);
+      // Optionally, set an error message to display in the UI
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -101,11 +110,21 @@ function App() {
         <div className="flex items-center justify-center">
           <button
             onClick={handleSubmit}
-            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline disabled:bg-blue-300"
+            disabled={loading}
           >
-            {t('analyzeProject')}
+            {loading ? t('analyzing') : t('analyzeProject')}
           </button>
         </div>
+
+        {answer && (
+          <div className="mt-6">
+            <h2 className="text-xl font-bold mb-4 text-gray-700">{t('analysisResult')}</h2>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <p className="text-gray-800">{answer}</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
