@@ -17,6 +17,7 @@ analysis:
   max_directory_depth: 5
   max_file_read_size: 150000 # in bytes
   max_prompt_length: 50000
+  max_file_retry_attempts: 3 # Maximum retry attempts for failed files
 
 explorer:
   ignore_dirs:

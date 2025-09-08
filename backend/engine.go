@@ -24,6 +24,7 @@ type AnalysisEngine struct {
 	kb           *KnowledgeBase
 	ollamaClient *OllamaClient
 	request      AnalyzeRequest
+	fileResolver *FileResolver
 }
 
 // StreamingAnalysisEngine orchestrates the project analysis with streaming updates.
@@ -31,6 +32,7 @@ type StreamingAnalysisEngine struct {
 	kb           *KnowledgeBase
 	ollamaClient *OllamaClient
 	request      AnalyzeRequest
+	fileResolver *FileResolver
 }
 
 // NewAnalysisEngine creates a new AnalysisEngine.
@@ -41,10 +43,13 @@ func NewAnalysisEngine(req AnalyzeRequest) (*AnalysisEngine, error) {
 		return nil, fmt.Errorf("failed to create Ollama client: %w", err)
 	}
 
+	fileResolver := NewFileResolver(req.ProjectPath, kb)
+
 	return &AnalysisEngine{
 		kb:           kb,
 		ollamaClient: ollamaClient,
 		request:      req,
+		fileResolver: fileResolver,
 	}, nil
 }
 
@@ -80,6 +85,9 @@ func (e *AnalysisEngine) initialAnalysis() error {
 	}
 	e.kb.ProjectStructure = structure
 	e.kb.AddHistory("Directory structure analysis complete.")
+
+	// Discover available project files
+	e.fileResolver.DiscoverProjectFiles()
 
 	// Read README file
 	readmePath := filepath.Join(e.kb.ProjectPath, "README.md")
@@ -139,6 +147,12 @@ Objective: Answer "%s"
 Current Context:
 %s
 ---
+IMPORTANT GUIDELINES:
+- DO NOT request files that are listed as "Non Disponibles" - they don't exist
+- Use available dependency files when looking for project information
+- If you need dependency info, use the files listed in "Fichiers de Dépendances Disponibles"
+- Avoid repeating failed operations from previous iterations
+
 Propose the next 3-5 logical steps. Use actions: READ_FILE <path>, ANALYZE <subject>, FINISH.
 MANDATORY output format: Simple numbered list.
 Example:
@@ -206,12 +220,37 @@ func (e *AnalysisEngine) executePlan(plan []string) {
 
 // executeReadFile reads a file and adds its content to the knowledge base.
 func (e *AnalysisEngine) executeReadFile(filePath string) {
-	fullPath := filepath.Join(e.kb.ProjectPath, filePath)
+	// Use FileResolver to find the best available file
+	resolvedFile, err := e.fileResolver.ResolveFile(filePath)
+	if err != nil {
+		e.kb.AddNote(fmt.Sprintf("Failed to resolve file '%s': %v", filePath, err))
+
+		// Suggest alternatives if available
+		if strings.Contains(strings.ToLower(filePath), "composer") {
+			alternatives := e.fileResolver.GetAvailableAlternatives("composer")
+			if len(alternatives) > 0 {
+				e.kb.AddNote(fmt.Sprintf("Available composer alternatives: %v", alternatives))
+			}
+		} else if strings.Contains(strings.ToLower(filePath), "package") {
+			alternatives := e.fileResolver.GetAvailableAlternatives("npm")
+			if len(alternatives) > 0 {
+				e.kb.AddNote(fmt.Sprintf("Available npm alternatives: %v", alternatives))
+			}
+		}
+		return
+	}
+
+	// Read the resolved file
+	fullPath := filepath.Join(e.kb.ProjectPath, resolvedFile)
 	content, err := readFileContent(fullPath)
 	if err != nil {
-		e.kb.AddNote(fmt.Sprintf("Failed to read '%s': %v", filePath, err))
+		e.kb.AddNote(fmt.Sprintf("Failed to read resolved file '%s': %v", resolvedFile, err))
+		e.kb.AddFailedFileAttempt(resolvedFile)
 	} else {
 		e.kb.AddFileContent(fullPath, content)
+		if resolvedFile != filePath {
+			e.kb.AddNote(fmt.Sprintf("Successfully read '%s' (alternative for '%s')", resolvedFile, filePath))
+		}
 	}
 }
 
@@ -249,10 +288,13 @@ func NewStreamingAnalysisEngine(req AnalyzeRequest) (*StreamingAnalysisEngine, e
 		return nil, fmt.Errorf("failed to create Ollama client: %w", err)
 	}
 
+	fileResolver := NewFileResolver(req.ProjectPath, kb)
+
 	return &StreamingAnalysisEngine{
 		kb:           kb,
 		ollamaClient: ollamaClient,
 		request:      req,
+		fileResolver: fileResolver,
 	}, nil
 }
 
@@ -311,6 +353,12 @@ func (e *StreamingAnalysisEngine) initialStreamingAnalysis(w http.ResponseWriter
 	}
 	e.kb.ProjectStructure = structure
 	e.kb.AddHistory("Directory structure analysis complete.")
+
+	e.sendEvent(w, "step", "discovery", "Discovering available project files...", 0, 0, "")
+
+	// Discover available project files
+	e.fileResolver.DiscoverProjectFiles()
+	e.sendEvent(w, "step", "discovery", fmt.Sprintf("Found %d available files", len(e.kb.AvailableFiles)), 0, 0, "")
 
 	e.sendEvent(w, "step", "readme", "Reading README file...", 0, 0, "")
 
@@ -394,15 +442,42 @@ func (e *StreamingAnalysisEngine) executeStreamingPlan(w http.ResponseWriter, pl
 
 // executeStreamingReadFile reads a file with streaming updates.
 func (e *StreamingAnalysisEngine) executeStreamingReadFile(w http.ResponseWriter, filePath string, iteration, total, stepNum, totalSteps int) {
-	e.sendEvent(w, "step", "read", fmt.Sprintf("Reading file: %s", filePath), iteration, total, "")
-	fullPath := filepath.Join(e.kb.ProjectPath, filePath)
+	e.sendEvent(w, "step", "read", fmt.Sprintf("Resolving file: %s", filePath), iteration, total, "")
+
+	// Use FileResolver to find the best available file
+	resolvedFile, err := e.fileResolver.ResolveFile(filePath)
+	if err != nil {
+		e.kb.AddNote(fmt.Sprintf("Failed to resolve file '%s': %v", filePath, err))
+		e.sendEvent(w, "error", "read", fmt.Sprintf("Failed to resolve %s: %v", filePath, err), iteration, total, "")
+
+		// Suggest alternatives if available
+		if strings.Contains(strings.ToLower(filePath), "composer") {
+			alternatives := e.fileResolver.GetAvailableAlternatives("composer")
+			if len(alternatives) > 0 {
+				e.sendEvent(w, "step", "read", fmt.Sprintf("Available composer alternatives: %v", alternatives), iteration, total, "")
+			}
+		}
+		return
+	}
+
+	if resolvedFile != filePath {
+		e.sendEvent(w, "step", "read", fmt.Sprintf("Using alternative file: %s", resolvedFile), iteration, total, "")
+	}
+
+	// Read the resolved file
+	fullPath := filepath.Join(e.kb.ProjectPath, resolvedFile)
 	content, err := readFileContent(fullPath)
 	if err != nil {
-		e.kb.AddNote(fmt.Sprintf("Failed to read '%s': %v", filePath, err))
-		e.sendEvent(w, "error", "read", fmt.Sprintf("Failed to read %s: %v", filePath, err), iteration, total, "")
+		e.kb.AddNote(fmt.Sprintf("Failed to read resolved file '%s': %v", resolvedFile, err))
+		e.kb.AddFailedFileAttempt(resolvedFile)
+		e.sendEvent(w, "error", "read", fmt.Sprintf("Failed to read %s: %v", resolvedFile, err), iteration, total, "")
 	} else {
 		e.kb.AddFileContent(fullPath, content)
-		e.sendEvent(w, "step", "read", fmt.Sprintf("Successfully read: %s (%d bytes)", filePath, len(content)), iteration, total, "")
+		successMsg := fmt.Sprintf("Successfully read: %s (%d bytes)", resolvedFile, len(content))
+		if resolvedFile != filePath {
+			successMsg += fmt.Sprintf(" (alternative for %s)", filePath)
+		}
+		e.sendEvent(w, "step", "read", successMsg, iteration, total, "")
 	}
 }
 
@@ -445,6 +520,12 @@ Objective: Answer "%s"
 Current Context:
 %s
 ---
+IMPORTANT GUIDELINES:
+- DO NOT request files that are listed as "Non Disponibles" - they don't exist
+- Use available dependency files when looking for project information
+- If you need dependency info, use the files listed in "Fichiers de Dépendances Disponibles"
+- Avoid repeating failed operations from previous iterations
+
 Propose the next 3-5 logical steps. Use actions: READ_FILE <path>, ANALYZE <subject>, FINISH.
 MANDATORY output format: Simple numbered list.
 Example:

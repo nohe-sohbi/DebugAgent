@@ -26,6 +26,7 @@ type AnalysisConfig struct {
 	MaxDirectoryDepth        int `yaml:"max_directory_depth"`
 	MaxFileReadSize          int `yaml:"max_file_read_size"`
 	MaxPromptLength          int `yaml:"max_prompt_length"`
+	MaxFileRetryAttempts     int `yaml:"max_file_retry_attempts"`
 }
 
 // ExplorerConfig defines the file explorer configuration.
