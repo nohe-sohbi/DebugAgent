@@ -12,15 +12,18 @@ import (
 
 // KnowledgeBase structure pour stocker les informations collectées pendant l'analyse.
 type KnowledgeBase struct {
-	ProjectPath      string
-	ProjectStructure map[string]interface{}
-	ProjectType      string
-	ReadmeContent    string
-	FileContents     map[string]string
-	AnalysisNotes    []string
-	ExplorationPlan  []string
+	ProjectPath        string
+	ProjectStructure   map[string]interface{}
+	ProjectType        string
+	ReadmeContent      string
+	FileContents       map[string]string
+	AnalysisNotes      []string
+	ExplorationPlan    []string
 	ExplorationHistory []string
-	mu               sync.Mutex // Pour gérer l'accès concurrentiel
+	FailedFileAttempts map[string]int    // Track failed file read attempts with retry count
+	AvailableFiles     []string          // Track files that exist and can be read
+	DependencyFiles    map[string]string // Map dependency types to found files
+	mu                 sync.Mutex        // Pour gérer l'accès concurrentiel
 }
 
 // NewKnowledgeBase crée une nouvelle instance de KnowledgeBase.
@@ -32,13 +35,16 @@ func NewKnowledgeBase(projectPath string) *KnowledgeBase {
 	}
 
 	return &KnowledgeBase{
-		ProjectPath:      absPath,
-		ProjectStructure: make(map[string]interface{}),
-		ProjectType:      "Inconnu",
-		FileContents:     make(map[string]string),
-		AnalysisNotes:    []string{},
-		ExplorationPlan:  []string{},
+		ProjectPath:        absPath,
+		ProjectStructure:   make(map[string]interface{}),
+		ProjectType:        "Inconnu",
+		FileContents:       make(map[string]string),
+		AnalysisNotes:      []string{},
+		ExplorationPlan:    []string{},
 		ExplorationHistory: []string{},
+		FailedFileAttempts: make(map[string]int),
+		AvailableFiles:     []string{},
+		DependencyFiles:    make(map[string]string),
 	}
 }
 
@@ -98,6 +104,47 @@ func (kb *KnowledgeBase) SetProjectType(pType string) {
 	}
 }
 
+// AddFailedFileAttempt tracks a failed file read attempt.
+func (kb *KnowledgeBase) AddFailedFileAttempt(filePath string) {
+	kb.mu.Lock()
+	defer kb.mu.Unlock()
+
+	kb.FailedFileAttempts[filePath]++
+	logrus.Debugf("Failed file attempt recorded for '%s' (attempt #%d)", filePath, kb.FailedFileAttempts[filePath])
+}
+
+// IsFileAttemptExceeded checks if a file has been attempted too many times.
+func (kb *KnowledgeBase) IsFileAttemptExceeded(filePath string, maxAttempts int) bool {
+	kb.mu.Lock()
+	defer kb.mu.Unlock()
+
+	return kb.FailedFileAttempts[filePath] >= maxAttempts
+}
+
+// AddAvailableFile tracks a file that exists and can be read.
+func (kb *KnowledgeBase) AddAvailableFile(filePath string) {
+	kb.mu.Lock()
+	defer kb.mu.Unlock()
+
+	// Avoid duplicates
+	for _, existing := range kb.AvailableFiles {
+		if existing == filePath {
+			return
+		}
+	}
+	kb.AvailableFiles = append(kb.AvailableFiles, filePath)
+	logrus.Debugf("Available file recorded: '%s'", filePath)
+}
+
+// AddDependencyFile maps a dependency type to a found file.
+func (kb *KnowledgeBase) AddDependencyFile(depType, filePath string) {
+	kb.mu.Lock()
+	defer kb.mu.Unlock()
+
+	kb.DependencyFiles[depType] = filePath
+	logrus.Infof("Dependency file found: %s -> %s", depType, filePath)
+}
+
 
 func (kb *KnowledgeBase) getContextSummary(userProblem string, maxPromptLength int) string {
 	var summary strings.Builder
@@ -136,19 +183,39 @@ func (kb *KnowledgeBase) getContextSummary(userProblem string, maxPromptLength i
 		}
 	}
 
+	// Add information about failed file attempts
+	summary.WriteString("\nFichiers Non Disponibles (éviter de les redemander):\n")
+	if len(kb.FailedFileAttempts) == 0 {
+		summary.WriteString("(Aucun)\n")
+	} else {
+		for filePath, attempts := range kb.FailedFileAttempts {
+			summary.WriteString(fmt.Sprintf("- %s (tenté %d fois)\n", filePath, attempts))
+		}
+	}
+
+	// Add information about available dependency files
+	summary.WriteString("\nFichiers de Dépendances Disponibles:\n")
+	if len(kb.DependencyFiles) == 0 {
+		summary.WriteString("(Aucun détecté)\n")
+	} else {
+		for depType, filePath := range kb.DependencyFiles {
+			summary.WriteString(fmt.Sprintf("- %s: %s\n", depType, filePath))
+		}
+	}
+
 	summary.WriteString("\nHistorique/Notes Récentes:\n")
 	combinedInfo := append(kb.AnalysisNotes, kb.ExplorationHistory...)
 	if len(combinedInfo) == 0 {
 		summary.WriteString("(Aucun)\n")
 	} else {
-		maxHistory := 8
+		maxHistory := 6 // Reduced to make room for new sections
 		start := 0
 		if len(combinedInfo) > maxHistory {
 			start = len(combinedInfo) - maxHistory
 		}
 		for _, info := range combinedInfo[start:] {
-			if len(info) > 100 {
-				info = info[:100]
+			if len(info) > 80 { // Reduced length to save space
+				info = info[:80] + "..."
 			}
 			summary.WriteString(fmt.Sprintf("- %s\n", info))
 		}
