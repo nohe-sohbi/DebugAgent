@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
 function App() {
@@ -9,7 +9,20 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [streamingProgress, setStreamingProgress] = useState([]);
+  const [currentStep, setCurrentStep] = useState('');
+  const [analysisComplete, setAnalysisComplete] = useState(false);
   const fileInputRef = useRef();
+  const eventSourceRef = useRef(null);
+
+  // Cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
+    };
+  }, []);
 
   const handleFileChange = (e) => {
     setFiles([...e.target.files]);
@@ -38,45 +51,107 @@ function App() {
       return;
     }
 
+    // Clean up previous EventSource if exists
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+    }
+
+    // Reset states
+    setAnswer('');
+    setStreamingProgress([]);
+    setCurrentStep('');
+    setAnalysisComplete(false);
+    setUploadProgress(0);
+    setIsUploading(true);
+    setLoading(false);
+
+    // First, upload files using regular POST
     const formData = new FormData();
     formData.append('question', question);
     for (const file of files) {
       formData.append('files', file, file.webkitRelativePath || file.name);
     }
 
-    setAnswer('');
-    setUploadProgress(0);
-    setIsUploading(true);
-
-    const xhr = new XMLHttpRequest();
-
-    xhr.upload.addEventListener('progress', (event) => {
-      if (event.lengthComputable) {
-        const percentComplete = Math.round((event.loaded / event.total) * 100);
-        setUploadProgress(percentComplete);
+    // Use fetch for streaming analysis
+    fetch('http://localhost:8080/analyze-stream', {
+      method: 'POST',
+      body: formData
+    })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-    });
-
-    xhr.addEventListener('load', () => {
+      
       setIsUploading(false);
-      setLoading(true); // Analysis starts now
-      if (xhr.status === 200) {
-        const data = JSON.parse(xhr.responseText);
-        setAnswer(data.answer);
-      } else {
-        console.error('Error submitting analysis request:', xhr.statusText);
-      }
-      setLoading(false);
-    });
-
-    xhr.addEventListener('error', () => {
+      setLoading(true);
+      
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      
+      const readStream = () => {
+        reader.read().then(({ done, value }) => {
+          if (done) {
+            setLoading(false);
+            return;
+          }
+          
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+          
+          lines.forEach(line => {
+            if (line.startsWith('data: ')) {
+              try {
+                const eventData = JSON.parse(line.slice(6));
+                handleStreamEvent(eventData);
+              } catch (e) {
+                console.warn('Failed to parse SSE data:', line);
+              }
+            }
+          });
+          
+          readStream();
+        }).catch(error => {
+          console.error('Stream reading error:', error);
+          setLoading(false);
+          setCurrentStep('Error: ' + error.message);
+        });
+      };
+      
+      readStream();
+    })
+    .catch(error => {
+      console.error('Fetch error:', error);
       setIsUploading(false);
       setLoading(false);
-      console.error('Error submitting analysis request: An unknown error occurred.');
+      setCurrentStep('Error: ' + error.message);
     });
-
-    xhr.open('POST', 'http://localhost:8080/analyze', true);
-    xhr.send(formData);
+  };
+  
+  const handleStreamEvent = (eventData) => {
+    console.log('Stream event:', eventData);
+    
+    setStreamingProgress(prev => [...prev, eventData]);
+    
+    switch (eventData.type) {
+      case 'progress':
+        setCurrentStep(`${eventData.message}`);
+        break;
+      case 'step':
+        setCurrentStep(`${eventData.message}`);
+        break;
+      case 'result':
+        setAnswer(eventData.data);
+        setCurrentStep('Analysis completed!');
+        setAnalysisComplete(true);
+        setLoading(false);
+        break;
+      case 'error':
+        setCurrentStep(`Error: ${eventData.message}`);
+        setLoading(false);
+        break;
+      default:
+        break;
+    }
   };
 
   return (
@@ -163,6 +238,38 @@ function App() {
               className="bg-blue-600 h-2.5 rounded-full"
               style={{ width: `${uploadProgress}%` }}
             ></div>
+          </div>
+        )}
+
+        {/* Streaming Progress Display */}
+        {loading && (
+          <div className="mt-6">
+            <h3 className="text-lg font-semibold text-gray-700 mb-3">Analysis Progress</h3>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="mb-2">
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
+                  <span className="text-sm text-blue-600 font-medium">{currentStep}</span>
+                </div>
+              </div>
+              
+              {/* Progress Log */}
+              <div className="max-h-40 overflow-y-auto bg-white p-3 rounded border text-xs">
+                {streamingProgress.map((event, index) => (
+                  <div key={index} className={`mb-1 ${
+                    event.type === 'error' ? 'text-red-600' :
+                    event.type === 'result' ? 'text-green-600' :
+                    event.type === 'step' ? 'text-blue-600' :
+                    'text-gray-600'
+                  }`}>
+                    {event.iteration > 0 && (
+                      <span className="text-gray-400 mr-2">[{event.iteration}/{event.total}]</span>
+                    )}
+                    <span className="font-medium">{event.step}:</span> {event.message}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 

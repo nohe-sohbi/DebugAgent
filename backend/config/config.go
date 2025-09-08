@@ -22,10 +22,10 @@ type OllamaConfig struct {
 
 // AnalysisConfig defines the analysis parameters.
 type AnalysisConfig struct {
-	MaxExplorationIterations int    `yaml:"max_exploration_iterations"`
-	MaxDirectoryDepth        int    `yaml:"max_directory_depth"`
-	MaxFileReadSize          int64  `yaml:"max_file_read_size"`
-	MaxPromptLength          int    `yaml:"max_prompt_length"`
+	MaxExplorationIterations int `yaml:"max_exploration_iterations"`
+	MaxDirectoryDepth        int `yaml:"max_directory_depth"`
+	MaxFileReadSize          int `yaml:"max_file_read_size"`
+	MaxPromptLength          int `yaml:"max_prompt_length"`
 }
 
 // ExplorerConfig defines the file explorer configuration.
@@ -89,6 +89,17 @@ func LoadConfig() error {
 	if err := v.Unmarshal(&cfg); err != nil {
 		return fmt.Errorf("could not unmarshal config: %w", err)
 	}
+
+	// Workaround: Manual assignment for analysis section due to Viper unmarshal issue
+	if cfg.Analysis.MaxPromptLength == 0 {
+		cfg.Analysis.MaxPromptLength = v.GetInt("analysis.max_prompt_length")
+		cfg.Analysis.MaxFileReadSize = v.GetInt("analysis.max_file_read_size")
+		cfg.Analysis.MaxExplorationIterations = v.GetInt("analysis.max_exploration_iterations")
+		cfg.Analysis.MaxDirectoryDepth = v.GetInt("analysis.max_directory_depth")
+	}
+
+	// Note: Viper's Unmarshal doesn't work properly with nested structs in some cases,
+	// so we use manual assignment for the analysis section if needed
 
 	AppConfig = &cfg
 	return nil

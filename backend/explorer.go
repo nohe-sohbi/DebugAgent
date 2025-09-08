@@ -111,7 +111,7 @@ func readFileContent(absFilepath string) (string, error) {
 
 	// Lire le contenu du fichier
 	size := fileInfo.Size()
-	maxSize := config.AppConfig.Analysis.MaxFileReadSize
+	maxSize := int64(config.AppConfig.Analysis.MaxFileReadSize)
 	if size > maxSize {
 		logrus.Warnf("File '%s' (%d bytes) is too large. Reading partially.", filepath.Base(absFilepath), size)
 		content, err := os.ReadFile(absFilepath)

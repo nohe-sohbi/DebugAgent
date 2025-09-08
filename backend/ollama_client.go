@@ -41,8 +41,10 @@ func NewOllamaClient() (*OllamaClient, error) {
 // ollamaRequest envoie une requête à Ollama en utilisant la fonction Generate.
 func (oc *OllamaClient) ollamaRequest(systemMessage, userPrompt string) (string, error) {
 	maxPromptLen := config.AppConfig.Analysis.MaxPromptLength
+	logrus.Debugf("Sending prompt of %d characters to Ollama (max: %d)", len(userPrompt), maxPromptLen)
+	
 	if len(userPrompt) > maxPromptLen {
-		logrus.Warnf("Prompt is being truncated to %d characters.", maxPromptLen)
+		logrus.Warnf("Prompt is being truncated from %d to %d characters.", len(userPrompt), maxPromptLen)
 		userPrompt = userPrompt[:maxPromptLen]
 	}
 
